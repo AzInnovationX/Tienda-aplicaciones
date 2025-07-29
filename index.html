@@ -667,14 +667,19 @@
             apiKey: "AIzaSyDtEV4B00LzmUJScBxhQ4Gh_cO7RmUSt3M",
             authDomain: "bace-datos.firebaseapp.com",
             projectId: "bace-datos",
-            storageBucket: "bace-datos.firebasestorage.app",
+            storageBucket: "bace-datos.appspot.com",
             messagingSenderId: "392224921438",
             appId: "1:392224921438:web:6222052d04d79b98f1e1cf",
             measurementId: "G-B5R5DK66FE"
         };
 
         // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
+        try {
+            firebase.initializeApp(firebaseConfig);
+        } catch (error) {
+            console.error("Error initializing Firebase: ", error);
+            showNotification("Error connecting to the service.", "error");
+        }
         const auth = firebase.auth();
         const db = firebase.firestore();
         const storage = firebase.storage();
@@ -700,6 +705,7 @@
             // Setup form listeners
             setupFormListeners();
             setupSearchListeners();
+            setupDragAndDrop();
         });
 
         // UI Updates
@@ -874,6 +880,16 @@
 
             if (!apkFile) {
                 showNotification('Debes seleccionar un archivo APK', 'error');
+                return;
+            }
+
+            if (!apkFile.name.endsWith('.apk')) {
+                showNotification('Solo se permiten archivos .apk', 'error');
+                return;
+            }
+
+            if (apkFile.size > 100 * 1024 * 1024) { // 100MB
+                showNotification('El archivo es demasiado grande (máximo 100MB)', 'error');
                 return;
             }
 
