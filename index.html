@@ -302,6 +302,17 @@
     <div class="notification" id="notification"></div>
 
     <script>
+        // IndexedDB helper
+        const dbPromise = new Promise((resolve, reject) => {
+            const request = indexedDB.open('apkStore', 1);
+            request.onerror = () => reject("Error opening IndexedDB");
+            request.onsuccess = () => resolve(request.result);
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                db.createObjectStore('files', { keyPath: 'path' });
+            };
+        });
+
         // Mock Firebase implementation for demo purposes
         class MockFirebase {
             constructor() {
@@ -596,44 +607,53 @@
                 return {
                     put: (file) => ({
                         on: (event, progressCallback, errorCallback, completeCallback) => {
-                            // Simulate file upload
-                            let progress = 0;
-                            const interval = setInterval(() => {
-                                progress += Math.random() * 20;
-                                if (progress >= 100) {
-                                    progress = 100;
-                                    clearInterval(interval);
-                                    const snapshot = {
-                                        ref: {
-                                            getDownloadURL: async () => `https://mockcdn.example.com/files/${path}`
-                                        }
-                                    };
-                                    setTimeout(() => {
-                                        completeCallback({ snapshot });
-                                    }, 500);
-                                } else {
-                                    progressCallback({
-                                        bytesTransferred: (progress / 100) * file.size,
-                                        totalBytes: file.size
-                                    });
-                                }
-                            }, 200);
-                            
+                            dbPromise.then(db => {
+                                const tx = db.transaction('files', 'readwrite');
+                                const store = tx.objectStore('files');
+                                store.put({ path, file });
+                                return tx.complete;
+                            }).then(() => {
+                                 // Simulate file upload progress
+                                let progress = 0;
+                                const interval = setInterval(() => {
+                                    progress += 20;
+                                    if (progress >= 100) {
+                                        progress = 100;
+                                        clearInterval(interval);
+                                        const snapshot = {
+                                            ref: {
+                                                getDownloadURL: async () => path
+                                            }
+                                        };
+                                        setTimeout(() => {
+                                            completeCallback({ snapshot });
+                                        }, 200);
+                                    } else {
+                                        progressCallback({
+                                            bytesTransferred: (progress / 100) * file.size,
+                                            totalBytes: file.size
+                                        });
+                                    }
+                                }, 100);
+                            }).catch(error => {
+                                errorCallback(error);
+                            });
+
                             return {
                                 snapshot: {
                                     ref: {
-                                        getDownloadURL: async () => {
-                                            // Return a mock URL
-                                            return `https://mockcdn.example.com/files/${path}`;
-                                        }
+                                        getDownloadURL: async () => path
                                     }
                                 }
                             };
                         }
                     }),
                     delete: async () => {
-                        // Mock delete operation
-                        return Promise.resolve();
+                        return dbPromise.then(db => {
+                            const tx = db.transaction('files', 'readwrite');
+                            tx.objectStore('files').delete(path);
+                            return tx.complete;
+                        });
                     }
                 };
             }
@@ -641,8 +661,11 @@
             refFromURL(url) {
                 return {
                     delete: async () => {
-                        // Mock delete operation
-                        return Promise.resolve();
+                         return dbPromise.then(db => {
+                            const tx = db.transaction('files', 'readwrite');
+                            tx.objectStore('files').delete(url);
+                            return tx.complete;
+                        });
                     }
                 };
             }
@@ -1270,6 +1293,32 @@
                     showNotification('Error: No se pudo encontrar el archivo APK', 'error');
                     return;
                 }
+
+                const db = await dbPromise;
+                const tx = db.transaction('files', 'readonly');
+                const store = tx.objectStore('files');
+                const fileRecord = await new Promise((resolve, reject) => {
+                    const request = store.get(app.apkUrl);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+
+                if (!fileRecord) {
+                    showNotification('Error: El archivo no se encuentra en el almacenamiento local.', 'error');
+                    return;
+                }
+
+                const blob = fileRecord.file;
+
+                // Create a download link and trigger the download
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = app.fileName || `${app.name}.apk`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+
 
                 // Show downloading notification
                 showNotification('Iniciando descarga...', 'info');
