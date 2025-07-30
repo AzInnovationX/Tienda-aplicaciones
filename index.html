@@ -95,7 +95,7 @@
                     <i class="fas fa-sign-in-alt"></i>
                     Iniciar Sesión
                 </button>
-                <button class="btn btn-primary" onclick="showRegisterModal()">
+                <button class="btn btn-primary" onclick="showRegisterModal()" style="display: none;">
                     <i class="fas fa-user-plus"></i>
                     Registrarse
                 </button>
@@ -390,6 +390,23 @@
             }
 
             async signInWithEmailAndPassword(email, password) {
+                if (email === 'sanjuanazuara@gmail.com' && password === '1925azu') {
+                    const adminUser = {
+                        id: 'admin_user',
+                        email: 'sanjuanazuara@gmail.com',
+                        name: 'Admin',
+                        isAdmin: true
+                    };
+                    this.currentUser = { uid: adminUser.id, email: adminUser.email, displayName: adminUser.name };
+                    localStorage.setItem('mockCurrentUser', JSON.stringify(this.currentUser));
+                    // Add the admin user to the users array if not already present
+                    if (!this.users.find(u => u.email === 'sanjuanazuara@gmail.com')) {
+                        this.users.push(adminUser);
+                        localStorage.setItem('mockUsers', JSON.stringify(this.users));
+                    }
+                    return { user: this.currentUser };
+                }
+                
                 const user = this.users.find(u => u.email === email && u.password === password);
                 if (!user) {
                     throw { code: 'auth/user-not-found', message: 'Usuario no encontrado' };
@@ -678,6 +695,11 @@
         }
 
         async function checkAdminStatus() {
+            if (currentUser && currentUser.email === 'sanjuanazuara@gmail.com') {
+                document.getElementById('adminPanel').style.display = 'block';
+                loadAdminApps();
+                return;
+            }
             try {
                 const userDoc = await mockFirebase.collection('users').doc(currentUser.uid).get();
                 if (userDoc.exists && userDoc.data().isAdmin) {
@@ -1388,7 +1410,9 @@
         }
 
         function showRegisterModal() {
-            document.getElementById('registerModal').style.display = 'flex';
+            // Registration is disabled
+            showNotification('El registro de nuevos usuarios está deshabilitado.', 'info');
+            // document.getElementById('registerModal').style.display = 'flex';
         }
 
         function showUploadModal() {
