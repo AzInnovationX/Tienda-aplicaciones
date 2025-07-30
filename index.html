@@ -114,21 +114,6 @@
             </div>
         </div>
 
-        <!-- Statistics Bar -->
-        <div class="stats-bar" id="statsBar" style="display: none;">
-            <div class="stat-item">
-                <span class="stat-value" id="totalApps">0</span>
-                <span>Apps Totales</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-value" id="totalDownloads">0</span>
-                <span>Descargas</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-value" id="totalUsers">0</span>
-                <span>Usuarios</span>
-            </div>
-        </div>
 
         <!-- Search and Filters -->
         <div class="search-section">
@@ -156,20 +141,10 @@
             </div>
         </div>
 
-        <!-- Apps Section -->
-        <div class="apps-section">
-            <h2 class="section-title">Aplicaciones Disponibles</h2>
-            <div class="apps-grid" id="appsGrid">
-                <div class="loading">
-                    <div class="spinner"></div>
-                </div>
-            </div>
-        </div>
 
         <!-- Admin Panel -->
         <div class="admin-panel" id="adminPanel">
             <h2 class="section-title">Panel de Administración</h2>
-            <div class="admin-apps" id="adminApps"></div>
         </div>
     </div>
 
@@ -1668,7 +1643,8 @@
 
         window.addEventListener('unhandledrejection', function(e) {
             console.error('Unhandled promise rejection:', e.reason);
-            showNotification('Error de conexión o procesamiento', 'error');
+            // Evitar que se muestre la notificación genérica para poder depurar el error real.
+            // showNotification('Error de conexión o procesamiento', 'error');
         });
 
         // Add performance monitoring
