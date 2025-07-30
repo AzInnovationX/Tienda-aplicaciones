@@ -158,6 +158,14 @@
         </div>
 
 
+        <!-- Apps Section -->
+        <div class="apps-section">
+            <h2 class="section-title">Aplicaciones Disponibles</h2>
+            <div class="apps-grid" id="appsGrid">
+                <!-- Apps will be loaded here -->
+            </div>
+        </div>
+
         <!-- Admin Panel -->
         <div class="admin-panel" id="adminPanel">
             <h2 class="section-title">Panel de Administración</h2>
@@ -172,11 +180,11 @@
             <h2>Iniciar Sesión</h2>
             <form id="loginForm">
                 <div class="form-group">
-                    <label>Email:</label>
+                    <label for="loginEmail">Email:</label>
                     <input type="email" id="loginEmail" required>
                 </div>
                 <div class="form-group">
-                    <label>Contraseña:</label>
+                    <label for="loginPassword">Contraseña:</label>
                     <input type="password" id="loginPassword" required>
                 </div>
                 <button type="submit" class="btn btn-primary" style="width: 100%;">
@@ -312,6 +320,7 @@
                 this.apps = JSON.parse(localStorage.getItem('mockApps') || '[]');
                 this.currentUser = JSON.parse(localStorage.getItem('mockCurrentUser') || 'null');
                 this.initialized = false;
+                this.authListeners = [];
                 
                 // Add some demo apps if none exist
                 if (this.apps.length === 0) {
@@ -385,8 +394,19 @@
                 });
             }
 
+            _triggerAuthListeners() {
+                this.authListeners.forEach(listener => {
+                    try {
+                        listener(this.currentUser);
+                    } catch (e) {
+                        console.error('Error in auth listener:', e);
+                    }
+                });
+            }
+
             onAuthStateChanged(callback) {
-                // Simulate auth state change
+                this.authListeners.push(callback);
+                // Simulate initial auth state check
                 setTimeout(() => {
                     callback(this.currentUser);
                 }, 100);
@@ -407,6 +427,7 @@
                         this.users.push(adminUser);
                         localStorage.setItem('mockUsers', JSON.stringify(this.users));
                     }
+                    this._triggerAuthListeners();
                     return { user: this.currentUser };
                 }
                 
@@ -417,6 +438,7 @@
                 
                 this.currentUser = { uid: user.id, email: user.email, displayName: user.name };
                 localStorage.setItem('mockCurrentUser', JSON.stringify(this.currentUser));
+                this._triggerAuthListeners();
                 return { user: this.currentUser };
             }
 
@@ -439,6 +461,7 @@
                 
                 this.currentUser = { uid: newUser.id, email: newUser.email, displayName: newUser.name };
                 localStorage.setItem('mockCurrentUser', JSON.stringify(this.currentUser));
+                this._triggerAuthListeners();
                 
                 return {
                     user: {
@@ -451,6 +474,7 @@
                                 localStorage.setItem('mockUsers', JSON.stringify(this.users));
                             }
                             localStorage.setItem('mockCurrentUser', JSON.stringify(this.currentUser));
+                            this._triggerAuthListeners();
                         }
                     }
                 };
@@ -459,6 +483,7 @@
             async signOut() {
                 this.currentUser = null;
                 localStorage.removeItem('mockCurrentUser');
+                this._triggerAuthListeners();
             }
 
             collection(name) {
@@ -693,7 +718,7 @@
             });
 
             // Initialize other components
-            loadApps();
+            loadApps(); // Load apps for all users
             loadStatistics();
             setupFormListeners();
             setupSearchListeners();
@@ -705,12 +730,21 @@
         function updateUI() {
             const authButtons = document.getElementById('authButtons');
             const userProfile = document.getElementById('userProfile');
-            
+            const uploadButton = document.querySelector('#userProfile .btn-primary');
+
             if (currentUser) {
                 authButtons.style.display = 'none';
                 userProfile.style.display = 'flex';
                 document.getElementById('userName').textContent = currentUser.displayName || currentUser.email;
                 document.getElementById('userAvatar').textContent = (currentUser.displayName || currentUser.email).charAt(0).toUpperCase();
+
+                // Show/hide Upload button based on admin status
+                if (currentUser.isAdmin) {
+                    uploadButton.style.display = 'inline-flex';
+                } else {
+                    uploadButton.style.display = 'none';
+                }
+
             } else {
                 authButtons.style.display = 'flex';
                 userProfile.style.display = 'none';
@@ -719,22 +753,34 @@
         }
 
         async function checkAdminStatus() {
-            if (currentUser && currentUser.email === 'sanjuanazuara@gmail.com') {
+            if (!currentUser) return;
+
+            // Hardcoded admin
+            if (currentUser.email === 'sanjuanazuara@gmail.com') {
+                currentUser.isAdmin = true;
                 document.getElementById('adminPanel').style.display = 'block';
                 loadAdminApps();
+                updateUI(); // Re-render UI to show/hide admin elements
                 return;
             }
+
+            // Check from mock database
             try {
                 const userDoc = await mockFirebase.collection('users').doc(currentUser.uid).get();
                 if (userDoc.exists && userDoc.data().isAdmin) {
+                    currentUser.isAdmin = true;
                     document.getElementById('adminPanel').style.display = 'block';
                     loadAdminApps();
                 } else {
+                    currentUser.isAdmin = false;
                     document.getElementById('adminPanel').style.display = 'none';
                 }
             } catch (error) {
                 console.error('Error checking admin status:', error);
+                currentUser.isAdmin = false;
+                document.getElementById('adminPanel').style.display = 'none';
             }
+            updateUI(); // Re-render UI to show/hide admin elements
         }
 
         async function loadStatistics() {
@@ -1037,8 +1083,8 @@
         }
 
         async function uploadApp() {
-            if (!currentUser) {
-                showNotification('Debes iniciar sesión para subir apps', 'error');
+            if (!currentUser || !currentUser.isAdmin) {
+                showNotification('No tienes permiso para subir aplicaciones.', 'error');
                 return;
             }
 
@@ -1347,7 +1393,7 @@
 
         async function downloadApp(appId) {
             try {
-                const app = allApps.find(a => a.id === appId);
+                const app = mockFirebase.apps.find(a => a.id === appId);
                 if (!app || !app.apkUrl) {
                     showNotification('Error: No se pudo encontrar el archivo APK', 'error');
                     return;
@@ -1449,6 +1495,10 @@
                         </div>
                     </div>
                     <div class="admin-actions">
+                        <button class="btn btn-primary" onclick="downloadApp('${app.id}')">
+                            <i class="fas fa-download"></i>
+                            Descargar
+                        </button>
                         ${!app.approved ? `
                             <button class="btn btn-success" onclick="approveApp('${app.id}')">
                                 <i class="fas fa-check"></i>
@@ -1482,6 +1532,11 @@
         }
 
         async function deleteApp(appId) {
+            if (!currentUser || !currentUser.isAdmin) {
+                showNotification('No tienes permiso para eliminar aplicaciones.', 'error');
+                return;
+            }
+
             if (!confirm('¿Estás seguro de que quieres eliminar esta aplicación? Esta acción no se puede deshacer.')) {
                 return;
             }
@@ -1558,9 +1613,7 @@
             if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
                 mockFirebase.signOut().then(() => {
                     showNotification('Sesión cerrada correctamente', 'success');
-                    allApps = [];
-                    updateUI();
-                    loadApps(); // Reload public apps
+                    window.location.reload();
                 }).catch((error) => {
                     console.error('Logout error:', error);
                     showNotification('Error al cerrar sesión', 'error');
@@ -1829,3 +1882,9 @@
     </script>
 </body>
 </html>
+
+[end of index.html]
+
+[end of index.html]
+
+[end of index.html]
