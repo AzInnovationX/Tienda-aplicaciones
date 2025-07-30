@@ -603,8 +603,13 @@
                                 if (progress >= 100) {
                                     progress = 100;
                                     clearInterval(interval);
+                                    const snapshot = {
+                                        ref: {
+                                            getDownloadURL: async () => `https://mockcdn.example.com/files/${path}`
+                                        }
+                                    };
                                     setTimeout(() => {
-                                        completeCallback();
+                                        completeCallback({ snapshot });
                                     }, 500);
                                 } else {
                                     progressCallback({
@@ -1134,9 +1139,9 @@
                         console.error(`Error uploading ${folder}:`, error);
                         reject(error);
                     },
-                    async () => {
+                    async (task) => {
                         try {
-                            const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
+                            const downloadURL = await task.snapshot.ref.getDownloadURL();
                             resolve(downloadURL);
                         } catch (error) {
                             reject(error);
