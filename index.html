@@ -56,6 +56,7 @@
         .admin-app-info {display:flex;align-items:center;gap:15px;}
         .admin-actions {display:flex;gap:10px;}
         .btn-danger {background:#ff4757;color:white;}
+        .btn-warning {background:#ffa502;color:white;}
         .btn-success {background:#2ed573;color:white;}
         .progress-bar {width:100%;height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden;margin:10px 0;}
         .progress-fill {height:100%;background:linear-gradient(135deg,#667eea,#764ba2);transition:width 0.3s ease;border-radius:4px;}
@@ -466,10 +467,11 @@
                         get: async () => {
                             if (name === 'users') {
                                 const user = this.users.find(u => u.id === id);
-                                return {
-                                    exists: !!user,
-                                    data: () => user
-                                };
+                                return { exists: !!user, data: () => user };
+                            }
+                            if (name === 'apps') {
+                                const app = this.apps.find(a => a.id === id);
+                                return { exists: !!app, data: () => app };
                             }
                             return { exists: false };
                         },
@@ -598,12 +600,15 @@
                 return {
                     put: (file) => ({
                         on: (event, progressCallback, errorCallback, completeCallback) => {
+                            console.log(`[put] Storing file. Path: ${path}`, file);
                             dbPromise.then(db => {
                                 const tx = db.transaction('files', 'readwrite');
                                 const store = tx.objectStore('files');
                                 store.put({ path, file });
+                                console.log('[put] File put in transaction.');
                                 return tx.complete;
                             }).then(() => {
+                                console.log('[put] Transaction completed successfully.');
                                  // Simulate file upload progress
                                 let progress = 0;
                                 const interval = setInterval(() => {
@@ -808,7 +813,14 @@
             // Upload form
             document.getElementById('uploadForm').addEventListener('submit', async function(e) {
                 e.preventDefault();
-                if (!uploadInProgress) {
+                if (uploadInProgress) return;
+
+                const form = e.target;
+                const editingAppId = form.dataset.editingAppId;
+
+                if (editingAppId) {
+                    await updateApp(editingAppId);
+                } else {
                     await uploadApp();
                 }
             });
@@ -1102,6 +1114,62 @@
             }
         }
 
+        async function updateApp(appId) {
+            const appIndex = mockFirebase.apps.findIndex(a => a.id === appId);
+            if (appIndex === -1) {
+                showNotification('Error: No se encontró la aplicación para actualizar', 'error');
+                return;
+            }
+
+            const name = document.getElementById('appName').value.trim();
+            const description = document.getElementById('appDescription').value.trim();
+            const category = document.getElementById('appCategory').value;
+            const version = document.getElementById('appVersion').value.trim();
+
+            // Basic validation
+            if (!name || !description || !category || !version) {
+                showNotification('Por favor completa todos los campos', 'error');
+                return;
+            }
+
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Actualizando...';
+
+            try {
+                // Simulate network delay
+                await new Promise(res => setTimeout(res, 500));
+
+                // Update data in our mock firebase object
+                const updatedApp = {
+                    ...mockFirebase.apps[appIndex],
+                    name,
+                    description,
+                    category,
+                    version,
+                };
+                mockFirebase.apps[appIndex] = updatedApp;
+
+                // Update localStorage
+                localStorage.setItem('mockApps', JSON.stringify(mockFirebase.apps));
+                
+                closeModal('uploadModal');
+                showNotification('Aplicación actualizada correctamente', 'success');
+                
+                // Refresh views
+                loadAdminApps();
+                loadApps();
+                loadStatistics();
+
+            } catch (error) {
+                console.error('Error updating app:', error);
+                showNotification('Error al actualizar la aplicación', 'error');
+                // Reset button on error
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = '<i class="fas fa-save"></i> Guardar Cambios';
+            }
+        }
+
         function validateUploadForm(name, description, category, version, apkFile) {
             if (!name || !description || !category || !version) {
                 showNotification('Por favor completa todos los campos obligatorios', 'error');
@@ -1387,6 +1455,10 @@
                                 Aprobar
                             </button>
                         ` : ''}
+                        <button class="btn btn-warning" onclick="showEditModal('${app.id}')">
+                            <i class="fas fa-edit"></i>
+                            Editar
+                        </button>
                         <button class="btn btn-danger" onclick="deleteApp('${app.id}')">
                             <i class="fas fa-trash"></i>
                             Eliminar
