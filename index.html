@@ -114,6 +114,21 @@
             </div>
         </div>
 
+        <!-- Statistics Bar -->
+        <div class="stats-bar" id="statsBar" style="display: none;">
+            <div class="stat-item">
+                <span class="stat-value" id="totalApps">0</span>
+                <span>Apps Aprobadas</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value" id="totalDownloads">0</span>
+                <span>Descargas Totales</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value" id="totalUsers">0</span>
+                <span>Usuarios</span>
+            </div>
+        </div>
 
         <!-- Search and Filters -->
         <div class="search-section">
@@ -145,6 +160,7 @@
         <!-- Admin Panel -->
         <div class="admin-panel" id="adminPanel">
             <h2 class="section-title">Panel de Administración</h2>
+            <div class="admin-apps" id="adminApps"></div>
         </div>
     </div>
 
@@ -1269,7 +1285,14 @@
                     return;
                 }
 
-                const db = await dbPromise;
+                const db = await dbPromise.catch(err => {
+                    console.error("Error opening IndexedDB:", err);
+                    showNotification('Error de almacenamiento local.', 'error');
+                    throw err; // re-throw to be caught by outer try-catch
+                });
+
+                if (!db) return; // Stop if db failed to open
+
                 const tx = db.transaction('files', 'readonly');
                 const store = tx.objectStore('files');
                 const fileRecord = await new Promise((resolve, reject) => {
@@ -1661,16 +1684,6 @@
 
         logPerformance();
 
-        // Service Worker for offline functionality (basic)
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/sw.js').then(function(registration) {
-                    console.log('SW registered: ', registration);
-                }).catch(function(registrationError) {
-                    console.log('SW registration failed: ', registrationError);
-                });
-            });
-        }
 
         // Add touch/swipe support for mobile
         function addTouchSupport() {
