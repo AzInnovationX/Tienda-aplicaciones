@@ -76,6 +76,42 @@
         .stat-item {text-align:center;padding:15px;background:rgba(255,255,255,0.1);border-radius:10px;color:white;min-width:120px;}
         .stat-value {font-size:1.5rem;font-weight:bold;display:block;}
         .offline-mode {background:rgba(255,193,7,0.9);color:#856404;padding:10px;text-align:center;border-radius:10px;margin-bottom:20px;}
+        
+        @media (max-width: 480px) {
+            .admin-app-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+            .admin-actions {
+                flex-direction: column;
+                width: 100%;
+                gap: 8px;
+            }
+            .admin-actions .btn {
+                width: 100%;
+                justify-content: center;
+            }
+            .modal-content {
+                padding: 20px;
+            }
+            .btn {
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+            .section-title {
+                font-size: 1.8rem;
+            }
+            .header {
+                padding: 15px;
+            }
+            .search-section {
+                padding: 15px;
+            }
+            .apps-section {
+                padding: 20px;
+            }
+        }
     </style>
 </head>
 <body>
